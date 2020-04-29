@@ -79,7 +79,9 @@ test_range  = {t: True for t in graph.times if t != None and t > 2016}
 types = graph.get_types()
 '''
     cand_list stores all the citations, which is the classification domain.
-    source has citation to target.
+    source has citation to target, or target is cited by source.
+    i.e.  in graph.edge_list['paper']['paper']['PP_cite'], the first paper is cited by the second paper.
+    target = prediction goal papers; source = query paper.
     cand_list is a list of target id.
 '''
 cand_list = list(graph.edge_list['paper']['paper']['PP_cite'].keys())
@@ -98,7 +100,8 @@ def node_classification_sample(seed, pairs, time_range, batch_size):
     target_ids = np.random.choice(list(pairs.keys()), batch_size, replace = False)
     target_info = []
     '''
-        (2) Get all the source_nodes (L2 fields) associated with these output nodes.
+        here we use reverse relation, now source=prediction, target=query.
+        (2) Get all the source_nodes (prediction paper) associated with these output nodes.
             Collect their information and time as seed nodes for sampling sub-graph.
     '''
     for target_id in target_ids:
@@ -117,16 +120,16 @@ def node_classification_sample(seed, pairs, time_range, batch_size):
         (4) Mask out the edge between the output target nodes (paper) with output source nodes (L2 field)
     '''
     masked_edge_list = []
-    for i in edge_list['paper']['field']['rev_PF_in_L2']:
+    for i in edge_list['paper']['paper']['rev_PP_cite']:
         if i[0] >= batch_size:
             masked_edge_list += [i]
-    edge_list['paper']['field']['rev_PF_in_L2'] = masked_edge_list
+    edge_list['paper']['paper']['rev_PP_cite'] = masked_edge_list
 
     masked_edge_list = []
-    for i in edge_list['field']['paper']['PF_in_L2']:
+    for i in edge_list['paper']['paper']['PP_cite']:
         if i[1] >= batch_size:
             masked_edge_list += [i]
-    edge_list['field']['paper']['PF_in_L2'] = masked_edge_list
+    edge_list['paper']['paper']['PP_cite'] = masked_edge_list
     
     '''
         (5) Transform the subgraph into torch Tensor (edge_index is in format of pytorch_geometric)
@@ -134,7 +137,7 @@ def node_classification_sample(seed, pairs, time_range, batch_size):
     node_feature, node_type, edge_time, edge_index, edge_type, node_dict, edge_dict = \
             to_torch(feature, times, edge_list, graph)
     '''
-        (6) Prepare the labels for each output target node (paper), and their index in sampled graph.
+        (6) Prepare the labels for each output target node (query paper), and their index in sampled graph.
             (node_dict[type][0] stores the start index of a specific type of nodes)
     '''
     ylabel = torch.zeros(batch_size, len(cand_list))
@@ -164,11 +167,13 @@ train_pairs = {}
 valid_pairs = {}
 test_pairs  = {}
 '''
-    Prepare all the souce nodes (L2 field) associated with each target node (paper) as dict
+    in 'PP_cite' relation, source has citation to target.
+    But here it uses 'rev_PP_cite' relation, source is cited by target
+    Prepare all the souce nodes (prediction) associated with each target node (query paper) as dict
 '''
-for target_id in graph.edge_list['paper']['field']['rev_PF_in_L2']:
-    for source_id in graph.edge_list['paper']['field']['rev_PF_in_L2'][target_id]:
-        _time = graph.edge_list['paper']['field']['rev_PF_in_L2'][target_id][source_id]
+for target_id in graph.edge_list['paper']['paper']['rev_PP_cite']:
+    for source_id in graph.edge_list['paper']['paper']['rev_PP_cite'][target_id]:
+        _time = graph.edge_list['paper']['paper']['rev_PP_cite'][target_id][source_id]
         if _time in train_range:
             if target_id not in train_pairs:
                 train_pairs[target_id] = [[], _time]
