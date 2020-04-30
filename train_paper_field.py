@@ -28,11 +28,11 @@ parser.add_argument('--domain', type=str, default='_CS',
 parser.add_argument('--conv_name', type=str, default='hgt',
                     choices=['hgt', 'gcn', 'gat', 'rgcn', 'han', 'hetgnn'],
                     help='The name of GNN filter. By default is Heterogeneous Graph Transformer (hgt)')
-parser.add_argument('--n_hid', type=int, default=400,
+parser.add_argument('--n_hid', type=int, default=256,
                     help='Number of hidden dimension')
 parser.add_argument('--n_heads', type=int, default=8,
                     help='Number of attention head')
-parser.add_argument('--n_layers', type=int, default=4,
+parser.add_argument('--n_layers', type=int, default=3,
                     help='Number of GNN layers')
 parser.add_argument('--dropout', type=int, default=0.2,
                     help='Dropout ratio')

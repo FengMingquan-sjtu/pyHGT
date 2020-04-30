@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from torch_geometric.nn import GCNConv, GATConv
+from torch_geometric.nn import GCNConv, GATConv, RGCNConv
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import glorot, uniform
 from torch_geometric.utils import softmax
@@ -157,6 +157,11 @@ class GeneralConv(nn.Module):
             self.base_conv = GCNConv(in_hid, out_hid)
         elif self.conv_name == 'gat':
             self.base_conv = GATConv(in_hid, out_hid // n_heads, heads=n_heads)
+        elif self.conv_name == 'rgcn':
+            self.base_conv = RGCNConv(in_hid, out_hid, num_relations, num_bases=5)
+        else:
+            raise NotImplementedError("conv_name=%s is not implemented"%conv_name)
+
     def forward(self, meta_xs, node_type, edge_index, edge_type, edge_time):
         if self.conv_name == 'hgt':
             return self.base_conv(meta_xs, node_type, edge_index, edge_type, edge_time)
@@ -164,5 +169,7 @@ class GeneralConv(nn.Module):
             return self.base_conv(meta_xs, edge_index)
         elif self.conv_name == 'gat':
             return self.base_conv(meta_xs, edge_index)
+        elif self.conv_name == 'rgcn':
+            return self.base_conv(meta_xs, edge_index, edge_type)
     
   

@@ -40,6 +40,9 @@ parser.add_argument('--sample_depth', type=int, default=6,
                     help='How many numbers to sample the graph')
 parser.add_argument('--sample_width', type=int, default=128,
                     help='How many nodes to be sampled per layer per type')
+parser.add_argument('--eval_matrix', type=str, default='loss',
+                    choices=['loss','ndcg'],
+                    help='evaluation matrix to select best model')
 
 '''
     Optimization arguments
@@ -221,6 +224,7 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 1000, eta_min=
 stats = []
 res = []
 best_val   = 0
+best_valid_loss = 1e5
 train_step = 1500
 
 pool = mp.Pool(args.n_pool)
@@ -277,17 +281,28 @@ for epoch in np.arange(args.n_epoch) + 1:
                                    edge_time.to(device), edge_index.to(device), edge_type.to(device))
         res  = classifier.forward(node_rep[x_ids])
         loss = criterion(res, ylabel.to(device))
+        valid_loss = loss.cpu().detach().tolist()
         
         '''
-            Calculate Valid NDCG. Update the best model based on highest NDCG score.
+            Calculate Valid NDCG. 
         '''
         valid_res = []
         for ai, bi in zip(ylabel, res.argsort(descending = True)):
             valid_res += [ai[bi].tolist()]
         valid_ndcg = np.average([ndcg_at_k(resi, len(resi)) for resi in valid_res])
-        
-        if valid_ndcg > best_val:
+
+        '''
+           Update the best model based on valid NDCG
+        '''
+        if args.eval_matrix=='ndcg' and valid_ndcg > best_val:
             best_val = valid_ndcg
+            torch.save(model, os.path.join(args.model_dir, args.task_name + '_' + args.conv_name))
+            print('UPDATE!!!')
+        '''
+           Update the best model based on valid Loss
+        '''
+        if args.eval_matrix=='loss' and valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
             torch.save(model, os.path.join(args.model_dir, args.task_name + '_' + args.conv_name))
             print('UPDATE!!!')
         
@@ -312,12 +327,15 @@ with torch.no_grad():
         paper_rep = gnn.forward(node_feature.to(device), node_type.to(device), \
                     edge_time.to(device), edge_index.to(device), edge_type.to(device))[x_ids]
         res = classifier.forward(paper_rep)
+        loss = criterion(res, ylabel.to(device))
         for ai, bi in zip(ylabel, res.argsort(descending = True)):
             test_res += [ai[bi].tolist()]
     test_ndcg = [ndcg_at_k(resi, len(resi)) for resi in test_res]
     print('Last Test NDCG: %.4f' % np.average(test_ndcg))
     test_mrr = mean_reciprocal_rank(test_res)
     print('Last Test MRR:  %.4f' % np.average(test_mrr))
+    loss=loss.cpu().detach().tolist()
+    print('Last Test Loss: %.4f' % loss)
 
 
 best_model = torch.load(os.path.join(args.model_dir, args.task_name + '_' + args.conv_name))
@@ -331,9 +349,12 @@ with torch.no_grad():
         paper_rep = gnn.forward(node_feature.to(device), node_type.to(device), \
                     edge_time.to(device), edge_index.to(device), edge_type.to(device))[x_ids]
         res = classifier.forward(paper_rep)
+        loss = criterion(res, ylabel.to(device))
         for ai, bi in zip(ylabel, res.argsort(descending = True)):
             test_res += [ai[bi].tolist()]
     test_ndcg = [ndcg_at_k(resi, len(resi)) for resi in test_res]
     print('Best Test NDCG: %.4f' % np.average(test_ndcg))
     test_mrr = mean_reciprocal_rank(test_res)
     print('Best Test MRR:  %.4f' % np.average(test_mrr))
+    loss=loss.cpu().detach().tolist()
+    print('Best Test Loss: %.4f' % loss)
