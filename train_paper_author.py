@@ -7,7 +7,7 @@ filterwarnings("ignore")
 
 import argparse
 
-parser = argparse.ArgumentParser(description='Training GNN on Paper-citation classification task')
+parser = argparse.ArgumentParser(description='Training GNN on Paper-author classification task')
 
 '''
     Dataset arguments
@@ -80,16 +80,22 @@ valid_range = {t: True for t in graph.times if t != None and t >= 2015  and t <=
 test_range  = {t: True for t in graph.times if t != None and t > 2016}
 
 types = graph.get_types()
+
 '''
-    cand_list stores all the citations, which is the classification domain.
-    source has citation to target, or target is cited by source.
-    i.e.  in graph.edge_list['paper']['paper']['PP_cite'], the first paper is cited by the second paper.
-    target = prediction goal papers; source = query paper.
-    cand_list is a list of target id.
+    cand_list stores all the authors, which is the classification domain.
+    graph.edge_list['author']['paper']['rev_AP_write_first']
+    since there are multiple authors for one paper
+    we define author_sequence = ['first','last','other']
+    target = prediction goal authors; source = query paper.
+    cand_list = a list of target id, i.e. author id.
 '''
-cand_list = list(graph.edge_list['paper']['paper']['PP_cite'].keys())
+author_sequence = ['first','last','other']
+cand_list = []
+for au_seq in author_sequence:
+    cand_list += list(graph.edge_list['author']['paper']['rev_AP_write_'+au_seq].keys())
+
 '''
-Use KL Divergence here, since each paper can cite multiple papers.
+Use KL Divergence here, since each paper can have multiple authors.
 Thus this task is a multi-label classification.
 '''
 criterion = nn.KLDivLoss(reduction='batchmean')
@@ -97,14 +103,14 @@ criterion = nn.KLDivLoss(reduction='batchmean')
 def node_classification_sample(seed, pairs, time_range, batch_size):
     '''
         sub-graph sampling and label preparation for node classification:
-        (1) Sample batch_size number of output nodes (query papers)
+        (1) Sample batch_size number of output nodes (papers)
     '''
     np.random.seed(seed)
     target_ids = np.random.choice(list(pairs.keys()), batch_size, replace = False)
     target_info = []
     '''
-        here we use reverse relation, now source=prediction, target=query.
-        (2) Get all the source_nodes (prediction paper) associated with these output nodes.
+        here we use reverse relation, now source=prediction author, target=query paper.
+        (2) Get all the source_nodes (prediction auhtor) associated with these output nodes.
             Collect their information and time as seed nodes for sampling sub-graph.
     '''
     for target_id in target_ids:
@@ -114,25 +120,28 @@ def node_classification_sample(seed, pairs, time_range, batch_size):
     '''
         (3) Based on the seed nodes, sample a subgraph with 'sampled_depth' and 'sampled_number'
     '''
+
+    
     feature, times, edge_list, _, _ = sample_subgraph(graph, time_range, \
                 inp = {'paper': np.array(target_info)}, \
                 sampled_depth = args.sample_depth, sampled_number = args.sample_width)
-
+    
 
     '''
-        (4) Mask out the edge between the output target nodes (query paper) with output source nodes (prediction paper)
+        (4) Mask out the edge between the output target nodes (paper) with output source nodes (authors)
     '''
-    masked_edge_list = []
-    for i in edge_list['paper']['paper']['rev_PP_cite']:
-        if i[0] >= batch_size:
-            masked_edge_list += [i]
-    edge_list['paper']['paper']['rev_PP_cite'] = masked_edge_list
+    for au_seq in author_sequence:
+        masked_edge_list = []
+        for i in edge_list['paper']['author']['AP_write_'+au_seq]:
+            if i[0] >= batch_size:
+                masked_edge_list += [i]
+        edge_list['paper']['author']['AP_write_'+au_seq] = masked_edge_list
 
-    masked_edge_list = []
-    for i in edge_list['paper']['paper']['PP_cite']:
-        if i[1] >= batch_size:
-            masked_edge_list += [i]
-    edge_list['paper']['paper']['PP_cite'] = masked_edge_list
+        masked_edge_list = []
+        for i in edge_list['author']['paper']['rev_AP_write_'+au_seq]:
+            if i[1] >= batch_size:
+                masked_edge_list += [i]
+        edge_list['author']['paper']['rev_AP_write_'+au_seq] = masked_edge_list
     
     '''
         (5) Transform the subgraph into torch Tensor (edge_index is in format of pytorch_geometric)
@@ -170,25 +179,24 @@ train_pairs = {}
 valid_pairs = {}
 test_pairs  = {}
 '''
-    in 'PP_cite' relation, source has citation to target.
-    But here it uses 'rev_PP_cite' relation, source is cited by target
     Prepare all the souce nodes (prediction) associated with each target node (query paper) as dict
 '''
-for target_id in graph.edge_list['paper']['paper']['rev_PP_cite']:
-    for source_id in graph.edge_list['paper']['paper']['rev_PP_cite'][target_id]:
-        _time = graph.edge_list['paper']['paper']['rev_PP_cite'][target_id][source_id]
-        if _time in train_range:
-            if target_id not in train_pairs:
-                train_pairs[target_id] = [[], _time]
-            train_pairs[target_id][0] += [source_id]
-        elif _time in valid_range:
-            if target_id not in valid_pairs:
-                valid_pairs[target_id] = [[], _time]
-            valid_pairs[target_id][0] += [source_id]
-        else:
-            if target_id not in test_pairs:
-                test_pairs[target_id]  = [[], _time]
-            test_pairs[target_id][0]  += [source_id]
+for au_seq in author_sequence:
+    for target_id in graph.edge_list['paper']['author']['AP_write_'+au_seq]:
+        for source_id in graph.edge_list['paper']['author']['AP_write_'+au_seq][target_id]:
+            _time = graph.edge_list['paper']['author']['AP_write_'+au_seq][target_id][source_id]
+            if _time in train_range:
+                if target_id not in train_pairs:
+                    train_pairs[target_id] = [[], _time]
+                train_pairs[target_id][0] += [source_id]
+            elif _time in valid_range:
+                if target_id not in valid_pairs:
+                    valid_pairs[target_id] = [[], _time]
+                valid_pairs[target_id][0] += [source_id]
+            else:
+                if target_id not in test_pairs:
+                    test_pairs[target_id]  = [[], _time]
+                test_pairs[target_id][0]  += [source_id]
 
 
 np.random.seed(43)
