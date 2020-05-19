@@ -1,0 +1,1 @@
+singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python convert2fact.py --data_dir /data/fengmingquan/data --domain _NN --out_dir  /data/fengmingquan/output/oag  1> out_convert.txt 2> log_convert.txt
