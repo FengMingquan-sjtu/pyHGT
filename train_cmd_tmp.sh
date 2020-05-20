@@ -1,6 +1,6 @@
 ====paper-cite-NN====
 
-setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_cite.py --data_dir /data/fengmingquan/data --domain _NN --model_dir  /data/fengmingquan/output/HGT --conv_name hgt --n_epoch 10 --cuda 0 1> out_cite_hgt.txt 2> log_cite_hgt.txt
+setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_cite.py --data_dir /data/fengmingquan/data --domain _NN --model_dir  /data/fengmingquan/output/HGT --conv_name hgt --n_layers 2 --n_epoch 3 --cuda 3 --prior_node_coef 0.1 --prior_relation_coef 0.1 1> out_cite_hgt.txt 2> log_cite_hgt.txt
 
 setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_cite.py --data_dir /data/fengmingquan/data --domain _NN --model_dir  /data/fengmingquan/output/HGT --conv_name gat --n_epoch 10 --cuda 2 1> out_cite_gat.txt 2> log_cite_gat.txt
 
@@ -11,7 +11,7 @@ available = ['hgt', 'gcn', 'gat', 'rgcn'];  not available = ['han', 'hetgnn']
 
 ====paper-cite-ML====
 
-setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_cite.py --data_dir /data/fengmingquan/data --domain _ML --model_dir  /data/fengmingquan/output/HGT --conv_name hgt --n_epoch 20 --cuda 0 1> out_cite_hgt.txt 2> log_cite_hgt.txt
+setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_cite.py --data_dir /data/fengmingquan/data --domain _ML --model_dir  /data/fengmingquan/output/HGT --conv_name hgt --n_epoch 20 --cuda 0  1> out_cite_hgt.txt 2> log_cite_hgt.txt
 
 setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_cite.py --data_dir /data/fengmingquan/data --domain _ML --model_dir  /data/fengmingquan/output/HGT --conv_name gat --n_epoch 20 --cuda 2 1> out_cite_gat.txt 2> log_cite_gat.txt
 
@@ -29,7 +29,7 @@ setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4
 
 
 ====paper-author-NN====
-setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_author.py --data_dir /data/fengmingquan/data --domain _NN --model_dir  /data/fengmingquan/output/HGT --conv_name hgt --n_epoch 10 --cuda 0 1> out_author_hgt.txt 2> log_author_hgt.txt
+setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_author.py --data_dir /data/fengmingquan/data --domain _NN --model_dir  /data/fengmingquan/output/HGT --conv_name hgt --n_epoch 10 --cuda 3 --prior_node_coef 0.1 --prior_relation_coef 0.1 1> out_author_hgt.txt 2> log_author_hgt.txt
 
 setsid singularity exec --nv -B /data /home/fengmingquan/sandbox/pytorch_geo_1.4 python train_paper_author.py --data_dir /data/fengmingquan/data --domain _NN --model_dir  /data/fengmingquan/output/HGT --conv_name gat --n_epoch 10 --cuda 0 1> out_author_gat.txt 2> log_author_gat.txt
 

@@ -84,7 +84,7 @@ class Graph():
 
 
 
-def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, inp = None, feature_extractor = feature_OAG):
+def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, inp = None, feature_extractor = feature_OAG, prior_coef=[0.0,0.0], node_type_prior_dict=None, relation_type_prior_dict=None):
     '''
         Sample Sub-Graph based on the connection of other nodes with currently sampled nodes
         We maintain budgets for each node type, indexed by <node_id, time>.
@@ -108,11 +108,21 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
         adding the degree count of these nodes in the budget.
         Note that there exist some nodes that have many neighborhoods
         (such as fields, venues), for those case, we only consider 
+        prior_coef = [node_coef, relation_coef]
+        node_type_prior_dict = type -> prior 
+        relation_type_prior_dict = type ->prior
     '''
-    def add_budget(te, target_id, target_time, layer_data, budget):
+    def add_budget(te, target_id, target_time, layer_data, budget, prior_coef=[0.0,0.0], node_type_prior_dict=None,relation_type_prior_dict=None):
         for source_type in te:
             tes = te[source_type]
+            node_type_prior = 1.0
+            if node_type_prior_dict and source_type in node_type_prior_dict.keys():
+                node_type_prior = node_type_prior_dict[source_type]
             for relation_type in tes:
+                relation_type_prior = 1.0
+                if relation_type_prior_dict and relation_type in relation_type_prior_dict.keys():
+                    relation_type_prior = relation_type_prior_dict[relation_type]
+ 
                 if relation_type == 'self' or target_id not in tes[relation_type]:
                     continue
                 adl = tes[relation_type][target_id]
@@ -126,7 +136,7 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
                         source_time = target_time
                     if source_time > np.max(list(time_range.keys())) or source_id in layer_data[source_type]:
                         continue
-                    budget[source_type][source_id][0] += 1. / len(sampled_ids)
+                    budget[source_type][source_id][0] += 1. / len(sampled_ids) + prior_coef[0]*node_type_prior + prior_coef[1]*relation_type_prior  # add prior
                     budget[source_type][source_id][1] = source_time
 
     '''
@@ -138,7 +148,7 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
     for _type in inp:
         te = graph.edge_list[_type]
         for _id, _time in inp[_type]:
-            add_budget(te, _id, _time, layer_data, budget)
+            add_budget(te, _id, _time, layer_data, budget, prior_coef, node_type_prior_dict, relation_type_prior_dict)
     '''
         We recursively expand the sampled graph by sampled_depth.
         Each time we sample a fixed number of nodes for each budget,
@@ -147,6 +157,7 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
     for layer in range(sampled_depth):
         sts = list(budget.keys())
         for source_type in sts:
+
             te = graph.edge_list[source_type]
             keys  = np.array(list(budget[source_type].keys()))
             if sampled_number > len(keys):
@@ -168,7 +179,7 @@ def sample_subgraph(graph, time_range, sampled_depth = 2, sampled_number = 8, in
             for k in sampled_keys:
                 layer_data[source_type][k] = [len(layer_data[source_type]), budget[source_type][k][1]]
             for k in sampled_keys:
-                add_budget(te, k, budget[source_type][k][1], layer_data, budget)
+                add_budget(te, k, budget[source_type][k][1], layer_data, budget, prior_coef, node_type_prior_dict, relation_type_prior_dict)
                 budget[source_type].pop(k)   
     '''
         Prepare feature, time and adjacency matrix for the sampled graph

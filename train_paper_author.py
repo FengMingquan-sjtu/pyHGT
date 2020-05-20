@@ -2,6 +2,7 @@ import sys
 from data import *
 from utils import *
 from model import *
+from prior import *
 from warnings import filterwarnings
 filterwarnings("ignore")
 
@@ -64,6 +65,11 @@ parser.add_argument('--batch_size', type=int, default=256,
                     help='Number of output nodes for training')    
 parser.add_argument('--clip', type=int, default=0.25,
                     help='Gradient Norm Clipping') 
+parser.add_argument('--prior_node_coef', type=float, default=0.0,
+                    help='prior coefficent for node prior') 
+parser.add_argument('--prior_relation_coef', type=float, default=0.0,
+                    help='prior coefficent for relation prior') 
+
 
 
 args = parser.parse_args()
@@ -100,7 +106,7 @@ Thus this task is a multi-label classification.
 '''
 criterion = nn.KLDivLoss(reduction='batchmean')
 
-def node_classification_sample(seed, pairs, time_range, batch_size):
+def node_classification_sample(seed, pairs, time_range, batch_size, prior_coef):
     '''
         sub-graph sampling and label preparation for node classification:
         (1) Sample batch_size number of output nodes (papers)
@@ -120,11 +126,18 @@ def node_classification_sample(seed, pairs, time_range, batch_size):
     '''
         (3) Based on the seed nodes, sample a subgraph with 'sampled_depth' and 'sampled_number'
     '''
-
+    relation_type_count_dict = {"PV_Conference":1}
+    node_type_count_dict = {"field":1}
+    node_type_prior_dict = calculate_node_type_prior(node_type_count_dict)
+    relation_type_prior_dict = calculate_relation_type_prior(relation_type_count_dict)
     
     feature, times, edge_list, _, _ = sample_subgraph(graph, time_range, \
                 inp = {'paper': np.array(target_info)}, \
-                sampled_depth = args.sample_depth, sampled_number = args.sample_width)
+                sampled_depth = args.sample_depth, sampled_number = args.sample_width, \
+                prior_coef = prior_coef, \
+                node_type_prior_dict = node_type_prior_dict, \
+                relation_type_prior_dict = relation_type_prior_dict
+                )
     
 
     '''
@@ -167,10 +180,10 @@ def prepare_data(pool):
     jobs = []
     for batch_id in np.arange(args.n_batch):
         p = pool.apply_async(node_classification_sample, args=(randint(), \
-            sel_train_pairs, train_range, args.batch_size))
+            sel_train_pairs, train_range, args.batch_size, [args.prior_node_coef,args.prior_relation_coef]))
         jobs.append(p)
     p = pool.apply_async(node_classification_sample, args=(randint(), \
-            sel_valid_pairs, valid_range, args.batch_size))
+            sel_valid_pairs, valid_range, args.batch_size, [args.prior_node_coef,args.prior_relation_coef]))
     jobs.append(p)
     return jobs
 
@@ -331,7 +344,7 @@ with torch.no_grad():
     test_res = []
     for _ in range(10):
         node_feature, node_type, edge_time, edge_index, edge_type, x_ids, ylabel = \
-                    node_classification_sample(randint(), test_pairs, test_range, args.batch_size)
+                    node_classification_sample(randint(), test_pairs, test_range, args.batch_size, [args.prior_node_coef,args.prior_relation_coef])
         paper_rep = gnn.forward(node_feature.to(device), node_type.to(device), \
                     edge_time.to(device), edge_index.to(device), edge_type.to(device))[x_ids]
         res = classifier.forward(paper_rep)
@@ -353,7 +366,7 @@ with torch.no_grad():
     test_res = []
     for _ in range(10):
         node_feature, node_type, edge_time, edge_index, edge_type, x_ids, ylabel = \
-                    node_classification_sample(randint(), test_pairs, test_range, args.batch_size)
+                    node_classification_sample(randint(), test_pairs, test_range, args.batch_size, [args.prior_node_coef,args.prior_relation_coef])
         paper_rep = gnn.forward(node_feature.to(device), node_type.to(device), \
                     edge_time.to(device), edge_index.to(device), edge_type.to(device))[x_ids]
         res = classifier.forward(paper_rep)
