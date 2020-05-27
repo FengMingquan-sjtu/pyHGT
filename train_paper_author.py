@@ -126,8 +126,8 @@ def node_classification_sample(seed, pairs, time_range, batch_size, prior_coef):
     '''
         (3) Based on the seed nodes, sample a subgraph with 'sampled_depth' and 'sampled_number'
     '''
-    relation_type_count_dict = {"PV_Conference":1}
-    node_type_count_dict = {"field":1}
+    relation_type_count_dict = {"PF_in_L3":1,"F_in_L1":1,"PP_cite":1}
+    node_type_count_dict = {"author":1,"paper":1}
     node_type_prior_dict = calculate_node_type_prior(node_type_count_dict)
     relation_type_prior_dict = calculate_relation_type_prior(relation_type_count_dict)
     

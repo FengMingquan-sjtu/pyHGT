@@ -28,7 +28,28 @@ def convert(args):
         if relation_type.startswith("rev_"):
             continue
         pred_file.write("{relation_type}(type,type)\n".format(relation_type=relation_type))
+    
+    if args.use_time == 1:
+        for relation_type in ["before","equal"]: #time relations
+            pred_file.write("{relation_type}(type,type)\n".format(relation_type=relation_type))
     pred_file.close()
+
+    target_id_time_dict = dict()
+    for target_type, source_type, relation_type in graph.get_meta_graph():
+        tmp_dict = graph.edge_list[target_type][source_type][relation_type]
+        target_ids = tmp_dict.keys()
+        for target_id in target_ids:
+            min_time = 3000
+            source_ids = tmp_dict[target_id].keys()
+            for source_id in source_ids:
+                time = tmp_dict[target_id][source_id]
+                if time is None:
+                    continue
+                min_time = min(time, min_time)
+            if target_id in target_id_time_dict:
+                target_id_time_dict[target_id] = min(min_time, target_id_time_dict[target_id])
+            else:
+                target_id_time_dict[target_id] = min_time
 
     for split_name in ["fact","valid","test"]:
         time_range_split = time_range[split_name]
@@ -46,7 +67,7 @@ def convert(args):
             tmp_dict = graph.edge_list[target_type][source_type][relation_type]
             target_ids = tmp_dict.keys()
             for target_id in target_ids:
-                if random.random() > 0.02:
+                if random.random() > 0.02: #skip most of data, due to limit of GPU
                     continue
                 node_id_type_set.add((target_id,target_type))
                 source_ids = tmp_dict[target_id].keys()
@@ -55,6 +76,17 @@ def convert(args):
                     if time in time_range_split: # if this time falls in this time range split, then record
                         node_id_type_set.add((source_id,source_type))
                         out_file.write("1\t{relation_type}({source_id},{target_id})\n".format(relation_type=relation_type,source_id=source_id,target_id=target_id))
+                    if args.use_time == 1 and random.random() > 0.9: # time relation (only randomly select small part of data)
+                        target_time = target_id_time_dict[target_id]
+                        source_time = target_id_time_dict[source_id]
+                        if (source_time == 3000 or target_time == 3000): #invalid data
+                            continue
+                        if source_time == target_time:
+                            out_file.write("1\t{relation_type}({source_id},{target_id})\n".format(relation_type="equal",source_id=source_id,target_id=target_id))
+                        elif source_time < target_time: # source before target
+                            out_file.write("1\t{relation_type}({source_id},{target_id})\n".format(relation_type="before",source_id=source_id,target_id=target_id))
+                        else : #target before source
+                            out_file.write("1\t{relation_type}({source_id},{target_id})\n".format(relation_type="before",source_id=target_id,target_id=source_id)) # notice target and source swapped.
 
 
         for node_id, node_type in node_id_type_set:
@@ -78,6 +110,8 @@ if __name__ == "__main__":
     parser.add_argument('--domain', type=str, default='_CS',
                     help='CS, Medicion or All: _CS or _Med or (empty)') 
     parser.add_argument('--out_dir', type=str, default='./data_save',
-                    help='The address for storing factor graph.')    
+                    help='The address for storing factor graph.') 
+    parser.add_argument('--use_time', type=int, default=1,
+                    help='whether use time relations')    
     args = parser.parse_args()
     convert(args)
